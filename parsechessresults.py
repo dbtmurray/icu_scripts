@@ -400,14 +400,12 @@ def parse_team_from_xlsx(workbook):
                     tokens = cell_value.split()
                     name_tokens = []
                     for token in tokens:
-                        print("examining token", token)
                         if token.isnumeric():
                             break
                         if is_fide_title(token):
                             continue
                         name_tokens.append(token)
                     name = " ".join(name_tokens).strip()
-                    print("got name", name)
                     player = Player(name)
                     players.append(player)
             elif isinstance(cell_value, int):
@@ -473,7 +471,7 @@ def apply_commas(players, commas):
                 result.opp_name = commas[result.opp_name]
 
 
-def parse(source, rds=None):
+def parse(source, rounds=None):
     url = source
 
     if not url.startswith("http"):
@@ -518,10 +516,9 @@ def parse(source, rds=None):
             players = [parse_individual_auto(soup)]
 
     elif "4nclresults.co.uk" in url:
-        if len(sys.argv) <= 2:
+        if rounds is None:
             raise ValueError("Need to specify round numbers for 4NCL results")
         players = []
-        rounds = sys.argv[2]
         urlparts = url.split("/")
         index = urlparts.index("4ncl") + 1
         if len(rounds) > 3:
