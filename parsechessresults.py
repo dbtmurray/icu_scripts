@@ -240,6 +240,8 @@ def parse_team(soup):
                 score = score_character(result)
                 player.score += score_value(result)
                 colour = score_colour(result)
+                playerResult = PlayerResult(player, rd, score, colour, name, rating, title, fed)
+                player.results[rd] = playerResult
             elif len(tds) == 9: # no Rp field!
                 # Rd, SNo, title, name, rating, fed, Rp, Pts, result, board
                 rd = int(tds[0].text)
@@ -315,7 +317,10 @@ def parse_individual_auto(soup):
     cols = [el.text for el in list(header.children) if isinstance(el, bs4.element.Tag)]
     round_index = cols.index("Rd.")
     opp_name_index = cols.index("Name")
-    rating_index = cols.index("RtgI")
+    try:
+        rating_index = cols.index("RtgI")
+    except ValueError:
+        rating_index = cols.index("Rtg")
     fed_index = cols.index("FED")
     result_index = cols.index("Res.")
     title_index = cols.index("") # maybe this won't always get it
@@ -467,9 +472,9 @@ def apply_commas(players, commas):
             for rd, result in player.results.items():
                 result.opp_name = commas[result.opp_name]
 
-if __name__ == "__main__":
 
-    url = sys.argv[1]
+def parse(source, rds=None):
+    url = source
 
     if not url.startswith("http"):
         # local file. Only for CR individual result right now
@@ -506,9 +511,11 @@ if __name__ == "__main__":
         event = soup.title.text.split(" - ")[1].strip()
 
         if "Team composition" in str(data) or "Player overview for" in str(data):
+            print("Parsing team")
             players = parse_team(soup)
         else:
-            players = [parse_individual(soup)]
+            print("Parsing for individual")
+            players = [parse_individual_auto(soup)]
 
     elif "4nclresults.co.uk" in url:
         if len(sys.argv) <= 2:
@@ -538,6 +545,10 @@ if __name__ == "__main__":
     if not players:
         raise ValueError("Could not parse any players")
 
+    return event, players
+
+
+def output(event, players, url):
     output_lines = []
     max_round = max(rd for player in players for rd in player.results)
     min_round = min(rd for player in players for rd in player.results)
@@ -572,4 +583,12 @@ if __name__ == "__main__":
         output_lines.append("Total,%3.1f" % player.score)
     print("\n".join(output_lines))
 
+if __name__ == "__main__":
+
+    source = sys.argv[1]
+    rds = None
+    if len(sys.argv) > 2:
+        rds = sys.argv[2]
+    event, players = parse(source, rds)
+    output(event, players, source)
 
