@@ -50,7 +50,19 @@ class Player:
 
 
 def is_opponent_class(css_class):
-    return css_class is not None and (str(css_class).startswith(("CRg", "CRng"))) and " " in str(css_class)
+    if css_class is None:
+        return False
+    if (str(css_class).startswith(("CRg", "CRng"))) and " " in str(css_class):
+        return True
+    elif str(css_class) in ["CRg2", "CRg1"]:
+        return True
+    else:
+        return False
+
+def is_header_class(css_class):
+    """return True iff we think this is the right class for the column headers"""
+    return str(css_class) in ["CRg1b"]
+
 
 def commaize(name):
     tokens = name.split()
@@ -266,7 +278,7 @@ def parse_individual(soup):
     output_lines.append("Player,????,%s" % playerName)
 
     for tr in trs:
-        tds = list(tr.children)
+        tds = [el for el in list(tr.children) if isinstance(el, bs4.element.Tag)]
         rd = int(tds[0].text)
         title = tds[3].text
         if title in ["AIM", "AFM", "AGM", "ACM"]: # not recognized by ICU software
@@ -286,6 +298,55 @@ def parse_individual(soup):
         playerResult = PlayerResult(player, rd, score, colour, name, rating, title, fed)
         player.results[rd] = playerResult
     return player
+
+def parse_individual_auto(soup):
+    """Parse results for an individual player, automatically getting the right columns
+    from the headers.
+    Should replace parse_individual and parse_team with this approach"""
+
+    div = [div for div in soup.find_all("div",class_="defaultDialog") if div.find("h2").text == "Player info"][0]
+
+    player = div.find(text="Name").next.text.strip()
+    playerName = commaize(player)
+    player = Player(playerName)
+    output_lines = []
+
+    header = div.find_all("tr", class_=is_header_class)[0]
+    cols = [el.text for el in list(header.children) if isinstance(el, bs4.element.Tag)]
+    round_index = cols.index("Rd.")
+    opp_name_index = cols.index("Name")
+    rating_index = cols.index("RtgI")
+    fed_index = cols.index("FED")
+    result_index = cols.index("Res.")
+    title_index = cols.index("") # maybe this won't always get it
+
+    trs = div.find_all("tr", class_=is_opponent_class)
+
+    total = 0
+    output_lines.append("Player,????,%s" % playerName)
+
+    for tr in trs:
+        tds = [el for el in list(tr.children) if isinstance(el, bs4.element.Tag)]
+        rd = int(tds[round_index].text)
+        title = tds[title_index].text
+        if title in ["AIM", "AFM", "AGM", "ACM"]: # not recognized by ICU software
+            title = ""
+        name = commaize(tds[opp_name_index].text)
+        rating = tds[rating_index].text
+        if int(rating) == 0:
+            rating = ""
+        fed = tds[fed_index].text
+        result = tds[result_index].text
+        score = score_character(result)
+        total += score_value(result)
+        colour = score_colour(result)
+
+        output_lines.append("%d,%s,%s,%s,%s,%s,%s" % (rd, score, colour, name, rating, title, fed))
+        player.score += score_value(result)
+        playerResult = PlayerResult(player, rd, score, colour, name, rating, title, fed)
+        player.results[rd] = playerResult
+    return player
+
 
 
 def parse_team_from_xlsx(workbook):
@@ -409,6 +470,19 @@ def apply_commas(players, commas):
 if __name__ == "__main__":
 
     url = sys.argv[1]
+
+    if not url.startswith("http"):
+        # local file. Only for CR individual result right now
+        with open(url, "r") as f:
+            data = f.read()
+            soup = bs4.BeautifulSoup(data, 'html.parser')
+
+        event = soup.title.text.split(" - ")[1].strip()
+
+        if "Team composition" in str(data) or "Player overview for" in str(data):
+            players = parse_team(soup)
+        else:
+            players = [parse_individual_auto(soup)]
 
     if "chess-results.com" in url and "excel=" in url:
         response = urllib.request.urlopen(url)
