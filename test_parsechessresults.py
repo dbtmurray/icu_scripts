@@ -36,7 +36,25 @@ def test_chessresults_team1():
     names = [player.name for player in players]
     assert "Kenny,William" in names
 
+def test_chessresults_team_excel():
+    """Parse many results from chess-results Excel format"""
+    url = "http://chess-results.com/tnr385901.aspx?lan=1&zeilen=0&art=25&fedb=IRL&turdet=YES&flag=30&prt=4&excel=2010"
+    event, players = parse.parse(url)
+    assert "World Youth Chess Championships" in event
+    assert len(players) == 8
+    names = [player.name for player in players]
+    assert "Plaza Reino,Mercedes" in names
 
+def test_4ncl_1():
+    """Parse 4ncl site"""
+    url = "http://www.4nclresults.co.uk/2018-19/4ncl/1/2b/export/"
+    rounds = "12"
+    event, players = parse.parse(url, rounds)
+    assert "4NCL" in event
+    assert len(players) == 8
+    assert players[0].name == "Jessel,Stephen"
+    assert players[0].score == 1.0
+    assert len(players[0].results) == 2
 
 
 
