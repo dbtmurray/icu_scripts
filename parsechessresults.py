@@ -14,6 +14,7 @@ python3 parsechessresults.py "http://chess-results.com/tnr367947.aspx?lan=1&art=
 python3 parsechessresults.py "http://chess-results.com/tnr373918.aspx?lan=1&art=20&fed=IRL&flag=30" # a team
 python3 parsechessresults.py "http://chess-results.com/tnr385901.aspx?lan=1&zeilen=0&art=25&fedb=IRL&turdet=YES&flag=30&prt=4&excel=2010" # a team, from Excel file
 python3 parsechessresults.py "http://www.4nclresults.co.uk/2018-19/4ncl/1/2b/export/" 12 # parse 4NCL site rounds 1 and 2 for div 2b
+python3 parsechessresults.py "http://www.4nclresults.co.uk/2018-19/4ncl/7/2b/export/" 72b,82c #4ncl that spans multiple divisions, here 7/2b and 8/2c
 
 Limitations:
     -need to add ICU code for the player (output as ???? instead)
@@ -34,7 +35,10 @@ class PlayerResult:
         self.colour = colour
         self.opp_name = opp_name
         self.opp_rating = opp_rating
-        self.opp_title = opp_title
+        if is_fide_title(opp_title):
+            self.opp_title = opp_title
+        else:
+            self.opp_title = ""
         self.opp_fed = opp_fed
         
 class Player:
@@ -65,6 +69,7 @@ def is_fide_title(text):
 
 def parse_4ncl_title(text):
     text = text.replace("j", "").strip()
+    text = text.replace("*", "").strip()
     titles_dict = {"" : "", "w" : "", "c" : "CM", "f" : "FM", "i" : "IM", "g" : "GM", "wc" : "WCM", "wf" : "WFM", "wi" : "wim", "wg" : "WGM"}
     return titles_dict[text]
 
@@ -210,7 +215,8 @@ def parse_team(soup):
                 name = commaize(name)
                 player = Player(name)
                 players.append(player)
-            else:
+            elif len(tds) == 10:
+                # Rd, SNo, title, name, rating, fed, Rp, Pts, result, board
                 rd = int(tds[0].text)
                 title = tds[2].text
                 name = commaize(tds[3].text)
@@ -222,6 +228,20 @@ def parse_team(soup):
                 score = score_character(result)
                 player.score += score_value(result)
                 colour = score_colour(result)
+            elif len(tds) == 9: # no Rp field!
+                # Rd, SNo, title, name, rating, fed, Rp, Pts, result, board
+                rd = int(tds[0].text)
+                title = tds[2].text
+                name = commaize(tds[3].text)
+                rating = tds[4].text
+                if int(rating) == 0:
+                    rating = ""
+                fed = tds[5].text
+                result = tds[7].text
+                score = score_character(result)
+                player.score += score_value(result)
+                colour = score_colour(result)
+
 
                 playerResult = PlayerResult(player, rd, score, colour, name, rating, title, fed)
                 player.results[rd] = playerResult
@@ -423,15 +443,21 @@ if __name__ == "__main__":
         rounds = sys.argv[2]
         urlparts = url.split("/")
         index = urlparts.index("4ncl") + 1
-        for rd in rounds:
+        if len(rounds) > 3:
+            # like "72b,82c" to get rounds 7/2b and 8/2c
+            new_rds = rounds.split(",")
+            new_rds = [[rd[:-2], rd[-2:]] for rd in new_rds]
+        else:
+            new_rds = [[rd] for rd in rounds]
+
+        for rd in new_rds:
             new_urlparts = urlparts
-            new_urlparts[index] = rd
+            new_urlparts[index:index+len(rd)] = rd
             url = "/".join(new_urlparts)
-            print("getting data from", url)
             response = urllib.request.urlopen(url)
             data = response.read()
             soup = bs4.BeautifulSoup(data, 'html.parser')
-            round_players = parse_4ncl(soup, int(rd))
+            round_players = parse_4ncl(soup, int(rd[0]))
             players = merge_players(players, round_players)
             event = "4NCL Rounds %s-%s" % (rounds[0], rounds[-1])
 
