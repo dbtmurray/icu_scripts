@@ -61,7 +61,7 @@ def is_opponent_class(css_class):
 
 def is_header_class(css_class):
     """return True iff we think this is the right class for the column headers"""
-    return str(css_class) in ["CRg1b"]
+    return str(css_class) in ["CRg1b", "CRng1b"]
 
 
 def commaize(name):
