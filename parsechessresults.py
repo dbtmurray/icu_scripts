@@ -509,10 +509,10 @@ def parse(source, rounds=None):
         event = soup.title.text.split(" - ")[1].strip()
 
         if "Team composition" in str(data) or "Player overview for" in str(data):
-            print("Parsing team")
+            #print("Parsing team")
             players = parse_team(soup)
         else:
-            print("Parsing for individual")
+            #print("Parsing for individual")
             players = [parse_individual_auto(soup)]
 
     elif "4nclresults.co.uk" in url:
