@@ -3,6 +3,7 @@ import bs4
 import sys
 from enum import Enum
 import io
+import ssl
 from openpyxl import load_workbook
 
 """
@@ -48,6 +49,11 @@ class Player:
         self.score = 0
         self.results = {}
 
+def insecure_urlopen(url):
+    """Open a URL without verifying SSL cert, because that was
+    broken for 4NCL"""
+    context = ssl._create_unverified_context()
+    return urllib.request.urlopen(url, context=context)
 
 def is_opponent_class(css_class):
     if css_class is None:
@@ -532,7 +538,12 @@ def parse(source, rounds=None):
             new_urlparts = urlparts
             new_urlparts[index:index+len(rd)] = rd
             url = "/".join(new_urlparts)
-            response = urllib.request.urlopen(url)
+            try:
+                response = insecure_urlopen(url)
+            except urllib.error.URLError:
+                print("Error opening URL %s" % url, file=sys.stderr)
+                return None, None
+
             data = response.read()
             soup = bs4.BeautifulSoup(data, 'html.parser')
             round_players = parse_4ncl(soup, int(rd[0]))
@@ -556,6 +567,10 @@ def output(event, players, url):
     output_lines.append("End,??/??/20??")
     output_lines.append("Rounds,%d" % num_rounds)
     output_lines.append("Website,%s" % url)
+
+    if players is None:
+        print("no results found at %s" % url)
+
 
     for player in players:
         output_lines.append("")
