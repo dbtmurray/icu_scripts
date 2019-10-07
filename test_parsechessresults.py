@@ -56,6 +56,13 @@ def test_4ncl_1():
     assert players[0].score == 1.0
     assert len(players[0].results) == 2
 
+def test_commas():
+    names = ["Heitz, Timo", "Thoele, Wolfgang, Dr.", "Hewson, Brian W R"]
+    expected = ["Heitz, Timo", "Thoele, Wolfgang Dr.", "Hewson, Brian W R"]
+    for name, exp in zip(names, expected):
+        replaced = parse.replace_all_but_one_comma(name)
+        assert replaced == exp
+
 
 
 

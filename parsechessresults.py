@@ -81,6 +81,14 @@ def commaize(name):
         surnames = 2
     return " ".join(tokens[:surnames]) + "," + " ".join(tokens[surnames:])
 
+def replace_all_but_one_comma(name):
+    """strip the name of any commas after the first"""
+    ncommas = name.count(",")
+    if ncommas > 1:
+        return name[::-1].replace(",", "", ncommas - 1)[::-1]
+    else:
+        return name
+
 def is_fide_title(text):
     titles = ["GM", "IM", "FM", "CM", "WGM", "WIM", "WFM", "WCM"]
     return text in titles
@@ -433,7 +441,8 @@ def parse_team_from_xlsx(workbook):
 def parse_commas_from_player_pairings(workbook):
     """This method figures out where commas go
     in player names. So it's maybe optional.
-    Returns a dict of {name without comma : name with comma}"""
+    Returns a dict of {name without comma : name with comma}.
+    Name with comma will have exactly one comma."""
     if "PlayerPairings" not in workbook.sheetnames:
         return None
     ws = workbook["PlayerPairings"]
@@ -453,12 +462,14 @@ def parse_commas_from_player_pairings(workbook):
             if name1.endswith(("(w)", "(b)")):
                 name1 = name1[:-4]
             name1_no_comma = name1.replace(",", "")
-            commas[name1_no_comma] = name1
+            name1_one_comma = replace_all_but_one_comma(name1)
+            commas[name1_no_comma] = name1_one_comma
         if name2 and "," in name2:
             if name2.endswith(("(w)", "(b)")):
                 name2 = name2[:-4]
             name2_no_comma = name2.replace(",", "")
-            commas[name2_no_comma] = name2
+            name2_one_comma = replace_all_but_one_comma(name2)
+            commas[name2_no_comma] = name2_one_comma
         
         row += 1
 
