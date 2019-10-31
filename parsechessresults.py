@@ -406,11 +406,19 @@ def parse_team_from_xlsx(workbook):
         return players
     elif "PlayerDetails" in workbook.sheetnames:
         ws = workbook["PlayerDetails"]
-        row = 3
+        row = 2
         while ws["A%s" % row].value:
             cell_value = ws["A%s" % row].value
             if isinstance(cell_value, str):
-                if "Rd." not in cell_value:
+                if "Rd." in cell_value:
+                    headings = [cell.value for cell in ws["%d:%d" % (row, row)]]
+                    opp_name_col = get_col(headings, "Name")
+                    if opp_name_col is not None:
+                        opp_title_col = chr(ord(opp_name_col) - 1)
+                    opp_rating_col = get_col(headings, "Rtg")
+                    opp_fed_col = get_col(headings, "FED")
+                    result_col = get_col(headings, "Res.")
+                else:
                     tokens = cell_value.split()
                     name_tokens = []
                     for token in tokens:
@@ -424,11 +432,15 @@ def parse_team_from_xlsx(workbook):
                     players.append(player)
             elif isinstance(cell_value, int):
                 rd = cell_value
-                opp_title = ws["C%s" % row].value or ""
-                opp_name = ws["D%s" % row].value.strip()
-                opp_rating = ws["E%s" % row].value
-                opp_fed = ws["F%s" % row].value
-                result = ws["H%s" % row].value.strip()
+                opp_title = ws["%s%s" % (opp_title_col, row)].value or ""
+                opp_name = ws["%s%s" % (opp_name_col, row)].value.strip()
+                opp_rating = ws["%s%s" % (opp_rating_col, row)].value
+                if opp_fed_col is None:
+                    opp_fed = "***"
+                else:
+                    opp_fed = ws["%s%s" % (opp_fed_col, row)].value
+
+                result = ws["%s%s" % (result_col, row)].value.strip()
                 score = score_character(result)
                 player.score += score_value(result)
                 colour = score_colour(result)
@@ -437,6 +449,17 @@ def parse_team_from_xlsx(workbook):
                 player.results[rd] = player_result
             row += 1
         return players
+
+def get_col(values, search_term):
+    """Returns the excel col where the search_term is first found in the list, or None"""
+    try:
+        col = values.index(search_term)
+    except ValueError:
+        return None
+    return letter(col)
+
+def letter(index):
+    return "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[index]
 
 def parse_commas_from_player_pairings(workbook):
     """This method figures out where commas go
