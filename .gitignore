@@ -2,5 +2,8 @@
 
 __pycache__/
 data/
+bin/
+lib/
+lib64
 
 *.pyc
