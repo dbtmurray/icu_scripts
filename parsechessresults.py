@@ -278,47 +278,10 @@ def parse_team(soup):
     return players
 
 
-
-def parse_individual(soup):
-
-    div = [div for div in soup.find_all("div",class_="defaultDialog") if div.find("h2").text == "Player info"][0]
-
-    player = div.find(text="Name").next.text.strip()
-    playerName = commaize(player)
-    player = Player(playerName)
-    output_lines = []
-
-    trs = div.find_all("tr", class_=is_opponent_class)
-
-    total = 0
-    output_lines.append("Player,????,%s" % playerName)
-
-    for tr in trs:
-        tds = [el for el in list(tr.children) if isinstance(el, bs4.element.Tag)]
-        rd = int(tds[0].text)
-        title = tds[3].text
-        if title in ["AIM", "AFM", "AGM", "ACM"]: # not recognized by ICU software
-            title = ""
-        name = commaize(tds[4].text)
-        rating = tds[5].text
-        if int(rating) == 0:
-            rating = ""
-        fed = tds[6].text
-        result = tds[8].text
-        score = score_character(result)
-        total += score_value(result)
-        colour = score_colour(result)
-
-        output_lines.append("%d,%s,%s,%s,%s,%s,%s" % (rd, score, colour, name, rating, title, fed))
-        player.score += score_value(result)
-        playerResult = PlayerResult(player, rd, score, colour, name, rating, title, fed)
-        player.results[rd] = playerResult
-    return player
-
 def parse_individual_auto(soup):
     """Parse results for an individual player, automatically getting the right columns
     from the headers.
-    Should replace parse_individual and parse_team with this approach"""
+    Should replace parse_team with this approach"""
 
     div = [div for div in soup.find_all("div",class_="defaultDialog") if div.find("h2").text == "Player info"][0]
 
@@ -355,17 +318,35 @@ def parse_individual_auto(soup):
         if int(rating) == 0:
             rating = ""
         fed = tds[fed_index].text
-        result = tds[result_index].text
-        score = score_character(result)
-        total += score_value(result)
-        colour = score_colour(result)
+        score, colour = parse_result_td(tds[result_index])
+        total += score_value(score)
 
         output_lines.append("%d,%s,%s,%s,%s,%s,%s" % (rd, score, colour, name, rating, title, fed))
-        player.score += score_value(result)
+        player.score += score_value(score)
         playerResult = PlayerResult(player, rd, score, colour, name, rating, title, fed)
         player.results[rd] = playerResult
     return player
 
+
+def parse_result_td(result_td):
+    if result_td.find_all("table"):
+        table = result_td.find("table")
+        colour_td = table.find_all("td")[0]
+        colour_div = colour_td.find("div")
+        if colour_div["class"] == ["FarbesT"]:
+            colour = Colour.BLACK
+        elif colour_div["class"] == ["FarbewT"]:
+            colour = Colour.WHITE
+        else:
+            raise ValueError(f"unknown class: {colour_div['class']} on {colour_div}")
+        score_td = table.find_all("td")[1]
+        result = result_td.text
+        score = score_character(result)
+    else:
+        result = result_td.text
+        score = score_character(result)
+        colour = score_colour(result)
+    return score, colour
 
 
 def parse_team_from_xlsx(workbook):
@@ -516,8 +497,9 @@ def parse(source, rounds=None):
 
     if not url.startswith("http"):
         # local file. Only for CR individual result right now
-        with open(url, "r") as f:
+        with open(url, "rb") as f:
             data = f.read()
+            data = preprocess_chessresults_html(data)
             soup = bs4.BeautifulSoup(data, 'html.parser')
 
         event = soup.title.text.split(" - ")[1].strip()
@@ -545,6 +527,7 @@ def parse(source, rounds=None):
     elif "chess-results.com" in url:
         response = urllib.request.urlopen(url)
         data = response.read()
+        data = preprocess_chessresults_html(data)
         soup = bs4.BeautifulSoup(data, 'html.parser')
         event = soup.title.text.split(" - ")[1].strip()
 
@@ -579,6 +562,7 @@ def parse(source, rounds=None):
                 return None, None
 
             data = response.read()
+            data = preprocess_chessresults_html(data)
             soup = bs4.BeautifulSoup(data, 'html.parser')
             round_players = parse_4ncl(soup, int(rd[0]))
             players = merge_players(players, round_players)
@@ -628,6 +612,13 @@ def output(event, players, url):
                     opp_name, opp_rating, result.opp_title, result.opp_fed))
         output_lines.append("Total,%3.1f" % player.score)
     print("\n".join(output_lines))
+
+def preprocess_chessresults_html(html):
+    """Preprocessing needed for broken HTML tags on chess-results site"""
+    html = html.replace(b'<div class="FarbewT"/></div>', b'<div class="FarbewT"></div>')
+    html = html.replace(b'<div class="FarbesT"/></div>', b'<div class="FarbesT"></div>')
+    return html
+
 
 if __name__ == "__main__":
 

@@ -1,6 +1,9 @@
 import parsechessresults as parse
 import bs4
 
+# These tests may break when chess-results updates their format.
+# For the most part, they should be considered integration tests.
+
 def test_chessresults_individual_auto_1():
     """Parse an individual from a Chess-results saved html"""
     with open("data/belyaladya1.html") as f:
@@ -27,7 +30,7 @@ def test_chessresults_team1():
     """Parse many results from chess-results.com2"""
     url = "http://chess-results.com/tnr373918.aspx?lan=1&art=20&fed=IRL&flag=30"
     event, players = parse.parse(url)
-    assert event == "34th European Club Cup"
+    assert event == "34th European Club Cup 2018"
     assert len(players) == 22
     assert players[0].name == "Mueller,Reinhold"
     assert players[0].score == 1.5
@@ -62,7 +65,5 @@ def test_commas():
     for name, exp in zip(names, expected):
         replaced = parse.replace_all_but_one_comma(name)
         assert replaced == exp
-
-
 
 
